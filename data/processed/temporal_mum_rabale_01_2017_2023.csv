@@ -1,0 +1,8 @@
+cluster_id,cluster_name,year,phase,core_lst_c,baseline_lst_c,delta_t_lst_c,ndvi_core,ndvi_baseline,delta_ndvi,ndbi_core,ambient_temp_era5_c,scenes_evaluated
+mum_rabale_01,Navi Mumbai - Rabale & Airoli DC Corridor,2017,Pre-Construction,41.96,37.34,4.62,0.227,0.361,-0.133,0.038,26.79,21
+mum_rabale_01,Navi Mumbai - Rabale & Airoli DC Corridor,2018,Pre-Construction,42.34,37.27,5.08,0.22,0.367,-0.147,0.049,27.14,18
+mum_rabale_01,Navi Mumbai - Rabale & Airoli DC Corridor,2019,Construction/Ramp,41.37,37.15,4.22,0.2,0.309,-0.109,0.051,26.81,16
+mum_rabale_01,Navi Mumbai - Rabale & Airoli DC Corridor,2020,Operational,42.0,36.79,5.21,0.192,0.328,-0.137,0.046,27.02,18
+mum_rabale_01,Navi Mumbai - Rabale & Airoli DC Corridor,2021,Operational,40.09,34.96,5.13,0.205,0.343,-0.139,0.063,26.95,20
+mum_rabale_01,Navi Mumbai - Rabale & Airoli DC Corridor,2022,Operational,40.52,35.04,5.48,0.22,0.372,-0.152,0.059,26.67,40
+mum_rabale_01,Navi Mumbai - Rabale & Airoli DC Corridor,2023,Operational,40.64,35.85,4.79,0.235,0.391,-0.156,0.073,27.33,39
