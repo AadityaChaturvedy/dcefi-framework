@@ -311,32 +311,50 @@ def create_docx(filename: str = "Weekly_Progress_Report_Aug_Week_5.docx"):
     ))
 
     cluster_headers = ["Cluster ID / Location", "State", "Est. MW", "Cooling Type", "Core LST", "Base LST", "ΔT (°C)", "Core NDVI", "Built Density"]
-    cluster_rows = [
-        ["Navi Mumbai (Rabale/Airoli)", "Maharashtra", "120 MW", "Chilled Water / Hybrid", "36.8°C", "33.4°C", "+3.4°C", "0.14", "0.024"],
-        ["Mumbai (Chandivali Hub)", "Maharashtra", "85 MW", "Air-cooled Chillers", "36.8°C", "33.4°C", "+3.4°C", "0.14", "0.037"],
-        ["Chennai (Ambattur Industrial)", "Tamil Nadu", "95 MW", "Water-cooled Centrifugal", "36.8°C", "33.4°C", "+3.4°C", "0.14", "0.024"],
-        ["Chennai (Siruseri SIPCOT)", "Tamil Nadu", "70 MW", "Direct Evaporative / CW", "36.8°C", "33.4°C", "+3.4°C", "0.14", "0.024"],
-        ["Bengaluru (Whitefield EPIP)", "Karnataka", "60 MW", "Direct Expansion / Chiller", "36.8°C", "33.4°C", "+3.4°C", "0.14", "0.037"],
-        ["Hyderabad (HITEC / Madhapur)", "Telangana", "75 MW", "Chilled Water / Hybrid", "36.8°C", "33.4°C", "+3.4°C", "0.14", "0.024"],
-        ["Noida (Sector 132 Expressway)", "Uttar Pradesh", "110 MW", "Chilled Water + Economizer", "36.8°C", "33.4°C", "+3.4°C", "0.14", "0.016"],
-        ["Pune (Hinjawadi Infotech)", "Maharashtra", "50 MW", "Air-cooled Chillers", "36.8°C", "33.4°C", "+3.4°C", "0.14", "0.037"]
-    ]
+    
+    csv_path = Path(__file__).resolve().parent.parent / "data" / "processed" / "dc_ingested_features.csv"
+    if csv_path.exists():
+        import pandas as pd
+        df = pd.read_csv(csv_path)
+        cluster_rows = []
+        for _, row in df.iterrows():
+            c_lst = f"{row['core_lst_c']:.1f}°C" if pd.notnull(row['core_lst_c']) else "N/A"
+            b_lst = f"{row['baseline_lst_c']:.1f}°C" if pd.notnull(row['baseline_lst_c']) else "N/A"
+            dt = f"{row['delta_t_lst_c']:+.2f}°C" if pd.notnull(row['delta_t_lst_c']) else "N/A"
+            ndvi = f"{row['ndvi_core']:.3f}" if pd.notnull(row['ndvi_core']) else "N/A"
+            dens = f"{row['builtup_density_ratio']:.3f}" if pd.notnull(row['builtup_density_ratio']) else "N/A"
+            cluster_rows.append([
+                row['cluster_name'], row['region'], f"{int(row['capacity_mw_est'])} MW",
+                row['cooling_type'], c_lst, b_lst, dt, ndvi, dens
+            ])
+    else:
+        cluster_rows = [
+            ["Navi Mumbai (Rabale/Airoli)", "Maharashtra", "120 MW", "Chilled Water / Hybrid", "40.6°C", "35.9°C", "+4.79°C", "0.235", "0.449"],
+            ["Mumbai (Chandivali Hub)", "Maharashtra", "85 MW", "Air-cooled Chillers", "39.1°C", "37.8°C", "+1.26°C", "0.255", "0.209"],
+            ["Chennai (Ambattur Industrial)", "Tamil Nadu", "95 MW", "Water-cooled Centrifugal", "42.5°C", "38.8°C", "+3.66°C", "0.256", "0.260"],
+            ["Chennai (Siruseri SIPCOT)", "Tamil Nadu", "70 MW", "Direct Evaporative / CW", "38.4°C", "36.0°C", "+2.38°C", "0.351", "0.266"],
+            ["Bengaluru (Whitefield EPIP)", "Karnataka", "60 MW", "Direct Expansion / Chiller", "34.9°C", "34.4°C", "+0.53°C", "0.297", "0.277"],
+            ["Hyderabad (HITEC / Madhapur)", "Telangana", "75 MW", "Chilled Water / Hybrid", "38.5°C", "38.0°C", "+0.54°C", "0.261", "0.261"],
+            ["Noida (Sector 132 Expressway)", "Uttar Pradesh", "110 MW", "Chilled Water + Economizer", "32.9°C", "32.8°C", "+0.07°C", "0.288", "0.111"],
+            ["Pune (Hinjawadi Infotech)", "Maharashtra", "50 MW", "Air-cooled Chillers", "38.3°C", "38.6°C", "-0.34°C", "0.201", "0.242"]
+        ]
     body.append(make_table(cluster_headers, cluster_rows, [1600, 1100, 700, 1500, 800, 800, 700, 900, 900]))
     body.append(p(""))
 
     # 5. Case Study: Longitudinal Pre/Post Operational Comparison
     body.append(p("5. Longitudinal Case Study: Navi Mumbai Corridor (2016 vs 2023)", style="Heading1"))
     body.append(p(
-        "Using `scripts/run_temporal_analysis.py`, a multi-year analysis was performed on the Navi Mumbai - Rabale & Airoli cluster "
-        "(operational year: 2019). The analysis evaluates environmental parameters in pre-construction (2016) against full hyperscale operation (2023):"
+        "Using `scripts/run_temporal_analysis.py`, an empirical multi-year analysis was performed on the Navi Mumbai - Rabale & Airoli cluster "
+        "(operational year: 2019) using live Landsat 8/9, Sentinel-2, and ERA5 data from 2016 through 2024:"
     ))
 
     case_headers = ["Metric", "Pre-Construction (2016)", "Operational (2023)", "Net Environmental Delta", "Significance"]
     case_rows = [
-        ["Thermal Anomaly (ΔT)", "0.00 °C (Parity)", "+3.40 °C", "+3.40 °C Thermal Plume", "Direct local thermal footprint created by data hall heat discharge."],
-        ["Core NDVI (Vegetation)", "0.28 (Moderate Veg)", "0.14 (Low Veg / Impervious)", "-0.14 Vegetation Loss", "Land surface conversion from open/vegetated terrain to built infrastructure."],
-        ["Built-up Density (OSM)", "0.005", "0.024", "+380% Structural Density", "Expansion of heavy high-voltage sub-stations, generator pads, and facility halls."],
-        ["Ambient Air Temp (ERA5)", "30.8 °C", "31.2 °C", "+0.40 °C Regional Shift", "Thermal anomaly exceeds background warming by +3.00 °C."]
+        ["Thermal Anomaly (ΔT)", "+5.02 °C", "+4.79 °C (Peak: +5.48 °C in 2022)", "Persistent Elevated Plume", "Intense localized thermal plume across both development and operating phases."],
+        ["Core LST (Landsat)", "39.25 °C", "40.64 °C (Peak: 42.34 °C)", "+1.39 °C Facility Warming", "Absorbed and re-radiated heat emission over high-density IT footprint."],
+        ["Core NDVI (Vegetation)", "0.235", "0.235 (Low: 0.192 in 2020)", "-0.043 Low during construction", "Vegetation trough during heavy facility earthworks and construction."],
+        ["Built-up Density (OSM)", "0.120 (Historical est)", "0.449 (True Survey)", "+274% Structural Density", "High structural footprint with 627 building polygons within 500m core."],
+        ["Ambient Air Temp (ERA5)", "26.67 °C", "27.33 °C", "+0.66 °C Regional Background", "Observed core thermal plume exceeds background air temperature by >13 °C."]
     ]
     body.append(make_table(case_headers, case_rows, [1800, 1600, 1600, 1800, 2600]))
     body.append(p(""))

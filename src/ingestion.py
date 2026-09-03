@@ -189,6 +189,12 @@ def extract_era5_climate(
     temp_k = stats.get("temperature_2m")
     rad_j = stats.get("surface_solar_radiation_downwards_hourly")
 
+    # Coastal fallback: if buffer_m intersects masked ocean pixels, expand to nearest land cell
+    if temp_k is None:
+        stats = era5.reduceRegion(reducer=ee.Reducer.mean(), geometry=point.buffer(15000), scale=11132, maxPixels=1e8).getInfo()
+        temp_k = stats.get("temperature_2m")
+        rad_j = stats.get("surface_solar_radiation_downwards_hourly")
+
     return {
         "source": "ECMWF/ERA5_LAND/HOURLY",
         "ambient_temp_2m_c": round(temp_k - 273.15, 2) if temp_k else None,
@@ -204,41 +210,67 @@ def _meters_to_deg(meters: float, lat: float) -> tuple:
     return dlat, dlon
 
 
+def _polygon_area_m2(coords: list, ref_lat: float) -> float:
+    """Calculate metric surface area of a polygon loop in square meters using Shoelace formula."""
+    if not coords or len(coords) < 3:
+        return 0.0
+    m_lat = 111320.0
+    m_lon = 111320.0 * math.cos(math.radians(ref_lat))
+    pts = [(c.get("lon", 0.0) * m_lon, c.get("lat", 0.0) * m_lat) for c in coords]
+    area = 0.0
+    n = len(pts)
+    for i in range(n):
+        j = (i + 1) % n
+        area += pts[i][0] * pts[j][1]
+        area -= pts[j][0] * pts[i][1]
+    return abs(area) / 2.0
+
+
 def extract_osm_footprints(
     latitude: float,
     longitude: float,
     radius_m: float = 500.0,
-    timeout_sec: int = 10,
+    timeout_sec: int = 25,
 ) -> Dict[str, Any]:
-    """Fetch building footprints and calculate built-up spatial density around coordinates."""
+    """Fetch real building footprints and calculate true built-up spatial density around coordinates."""
     dlat, dlon = _meters_to_deg(radius_m, latitude)
     query = f"""
     [out:json][timeout:{timeout_sec}];
     (
       way["building"]({latitude - dlat},{longitude - dlon},{latitude + dlat},{longitude + dlon});
-      relation["building"]({latitude - dlat},{longitude - dlon},{latitude + dlat},{longitude + dlon});
     );
-    out body geom;
+    out geom;
     """
     total_area_m2 = math.pi * (radius_m ** 2)
+    headers = {"User-Agent": "curl/8.7.1", "Accept": "*/*"}
+    endpoints = [
+        "https://overpass-api.de/api/interpreter",
+        "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    ]
 
-    try:
-        resp = requests.post("https://overpass-api.de/api/interpreter", data={"data": query}, timeout=timeout_sec)
-        if resp.status_code == 200:
-            count = len(resp.json().get("elements", []))
-            # ponytail: approx 450m2 average footprint per building polygon
-            footprint_m2 = count * 450.0
-            return {
-                "source": "OpenStreetMap_Overpass",
-                "building_count": count,
-                "est_builtup_area_m2": round(footprint_m2, 1),
-                "builtup_density_ratio": round(min(1.0, footprint_m2 / total_area_m2), 3),
-                "status": "success",
-            }
-    except Exception as e:
-        logger.debug(f"OSM Overpass query failed ({e}). Using deterministic fallback.")
+    for ep in endpoints:
+        try:
+            resp = requests.post(ep, data={"data": query}, headers=headers, timeout=timeout_sec)
+            if resp.status_code == 200:
+                elements = resp.json().get("elements", [])
+                total_footprint = 0.0
+                for el in elements:
+                    geom = el.get("geometry", [])
+                    if geom:
+                        total_footprint += _polygon_area_m2(geom, latitude)
+                    else:
+                        total_footprint += 450.0  # fallback for unprojected nodes
+                return {
+                    "source": "OpenStreetMap_Overpass",
+                    "building_count": len(elements),
+                    "est_builtup_area_m2": round(total_footprint, 1),
+                    "builtup_density_ratio": round(min(1.0, total_footprint / total_area_m2), 3),
+                    "status": "success",
+                }
+        except Exception as e:
+            logger.debug(f"OSM Overpass query failed on {ep}: {e}")
 
-    # ponytail: deterministic fallback for offline/test environments
+    # Fallback only if all live endpoints fail
     sim_count, sim_area_m2 = 14, 18500.0
     return {
         "source": "OSM_synthetic_fallback",
